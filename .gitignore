@@ -1,0 +1,11 @@
+# OS
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+*.swp
+*~
+
+# Temp
+_validate.ps1
