@@ -14,7 +14,7 @@ Crea un **perfil aislado** que no afecta la instalacion principal de OpenCode. C
 ## Uso
 
 ```powershell
-git clone <este-repo> opencode-omo-setup
+git clone https://github.com/butulia/opencode-omo-setup.git
 cd opencode-omo-setup
 powershell -ExecutionPolicy Bypass -File install-omo.ps1
 ```
