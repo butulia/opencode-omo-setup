@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # =========================================================
-#  OpenCode + OmO — Desinstalador
+#  OpenCode + OmO - Desinstalador
 #
 #  Elimina todo lo creado por install-omo.ps1:
 #    - Perfil aislado OmO
@@ -27,6 +27,9 @@ $CacheDir      = Join-Path $UserHome ".cache\opencode\packages\oh-my-openagent@l
 $AppDataOC     = Join-Path $env:APPDATA "opencode"
 $DataDir       = Join-Path $UserHome ".local\share\opencode-omo"
 $DesktopDir    = [Environment]::GetFolderPath("Desktop")
+$ScriptRoot    = $PSScriptRoot
+$Timestamp     = Get-Date -Format "yyyy-MM-dd_HHmmss"
+$LogFile       = Join-Path $ScriptRoot "uninstall-omo_$Timestamp.log"
 
 function Write-Step($msg) {
     Write-Host ""
@@ -44,7 +47,7 @@ function Remove-SafeItem($path, $label) {
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor White
-Write-Host "  OpenCode + OmO — Desinstalador" -ForegroundColor White
+Write-Host "  OpenCode + OmO - Desinstalador" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor White
 Write-Host ""
 Write-Host "  Esto eliminara:" -ForegroundColor Yellow
@@ -62,6 +65,9 @@ if ($confirm -ne "s" -and $confirm -ne "S") {
     Write-Host "Cancelado." -ForegroundColor Yellow
     exit 0
 }
+
+# ---- Iniciar transcripcion (log de resultados) ----
+Start-Transcript -Path $LogFile -Force | Out-Null
 
 # ---- Perfil aislado ----
 Write-Step "Eliminando perfil OmO aislado..."
@@ -124,6 +130,11 @@ Write-Host "==========================================================" -Foregro
 Write-Host ""
 Write-Host "  OpenCode Desktop funciona con normalidad via su acceso directo original." -ForegroundColor Gray
 Write-Host ""
+Write-Host "  Log de resultados: $LogFile" -ForegroundColor Gray
+Write-Host ""
+
+# ---- Detener transcripcion ----
+Stop-Transcript | Out-Null
 
 Write-Host "Presiona cualquier tecla para salir..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

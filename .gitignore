@@ -9,3 +9,6 @@ Desktop.ini
 
 # Temp
 _validate.ps1
+
+# Logs de ejecucion
+*.log

@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # =========================================================
-#  OpenCode + OmO (oh-my-openagent) — Instalador automatico
+#  OpenCode + OmO (oh-my-openagent) - Instalador automatico
 #
 #  Requisitos:
 #    - Windows 10/11
@@ -34,6 +34,11 @@ $AppDataOC       = Join-Path $AppData "opencode"
 $DataDir         = Join-Path $UserHome ".local\share\opencode-omo"
 $DesktopDir      = [Environment]::GetFolderPath("Desktop")
 $ScriptRoot      = $PSScriptRoot
+$Timestamp       = Get-Date -Format "yyyy-MM-dd_HHmmss"
+$LogFile         = Join-Path $ScriptRoot "install-omo_$Timestamp.log"
+
+# ---- Iniciar transcripcion (log de resultados) ----
+Start-Transcript -Path $LogFile -Force | Out-Null
 
 # ---- Detectar OpenCode Desktop ----
 $OpenCodePaths = @(
@@ -91,7 +96,7 @@ function Copy-ConfigFile($name, $dest) {
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor White
-Write-Host "  OpenCode + OmO (oh-my-openagent) — Instalador" -ForegroundColor White
+Write-Host "  OpenCode + OmO (oh-my-openagent) - Instalador" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor White
 
 Write-Step "Validando prerequisitos..."
@@ -165,7 +170,7 @@ try {
 #  PASO 2: Ejecutar instalador de OmO
 # =========================================================
 
-Write-Step "Ejecutando instalador de OmO (--copilot=yes)..."
+Write-Step 'Ejecutando instalador de OmO (--copilot=yes)...'
 
 Push-Location $ConfigDir
 try {
@@ -189,7 +194,7 @@ Copy-ConfigFile "opencode.json" (Join-Path $OmoProfileDir "opencode.json")
 # Asegurar que NO quede opencode.json en el config global (perfil limpio)
 $globalOC = Join-Path $ConfigDir "opencode.json"
 if (Test-Path $globalOC) {
-    # El instalador OmO puede haber creado uno aqui — moverlo
+    # El instalador OmO puede haber creado uno aqui - moverlo
     $backupPath = Join-Path $ConfigDir "opencode.json.bak-omo"
     Move-Item -Path $globalOC -Destination $backupPath -Force
     Write-Warn "opencode.json existente movido a $backupPath (perfil global limpio)"
@@ -345,6 +350,11 @@ Write-Host ""
 Write-Host "  Despues de actualizaciones de OmO:" -ForegroundColor Yellow
 Write-Host "  -> Click derecho en 'OmO-repatch-ZWSP.ps1' > Ejecutar con PowerShell" -ForegroundColor Yellow
 Write-Host ""
+Write-Host "  Log de resultados: $LogFile" -ForegroundColor Gray
+Write-Host ""
+
+# ---- Detener transcripcion ----
+Stop-Transcript | Out-Null
 
 Write-Host "Presiona cualquier tecla para salir..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
