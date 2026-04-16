@@ -9,7 +9,7 @@
   "agents": {
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
-      "variant": "max",
+      "variant": "high",
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.4",
@@ -31,7 +31,7 @@
         },
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         }
       ]
     },
@@ -48,7 +48,7 @@
     },
     "prometheus": {
       "model": "github-copilot/claude-opus-4.6",
-      "variant": "max",
+      "variant": "high",
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.4",
@@ -61,7 +61,7 @@
     },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
-      "variant": "max",
+      "variant": "high",
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.4",
@@ -75,7 +75,7 @@
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -109,7 +109,7 @@
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         }
       ]
     },
@@ -119,7 +119,7 @@
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         }
       ]
     },
@@ -129,7 +129,7 @@
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         },
         {
           "model": "github-copilot/gemini-3.1-pro-preview",
@@ -143,7 +143,7 @@
       "fallback_models": [
         {
           "model": "github-copilot/claude-opus-4.6",
-          "variant": "max"
+          "variant": "high"
         },
         {
           "model": "github-copilot/gpt-5.4"
