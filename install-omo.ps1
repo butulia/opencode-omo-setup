@@ -129,7 +129,7 @@ if ($OpenCodeExe) {
 }
 
 # Config files in repo
-$requiredConfigs = @("opencode.json", "oh-my-openagent.json")
+$requiredConfigs = @("opencode.json")
 foreach ($f in $requiredConfigs) {
     $fp = Join-Path $ScriptRoot "config\$f"
     if (Test-Path $fp) {
@@ -302,20 +302,95 @@ if (Test-Path $globalOC) {
 }
 
 # =========================================================
-#  PASO 4: Distribuir config de agentes
+#  PASO 4: Parchear variants de Claude y distribuir config
 # =========================================================
 
-Write-Step "Distribuyendo oh-my-openagent.json..."
+Write-Step "Parcheando oh-my-openagent.json generado por OmO..."
 
-# Ruta principal (donde OmO lo busca primero)
-Copy-ConfigFile "oh-my-openagent.json" (Join-Path $ConfigDir "oh-my-openagent.json")
+$omoConfig = Join-Path $ConfigDir "oh-my-openagent.json"
 
-# Copia en %APPDATA%\opencode (ruta alternativa de busqueda)
+if (-not (Test-Path $omoConfig)) {
+    # OmO podria haberlo dejado en AppData
+    $altConfig = Join-Path $AppDataOC "oh-my-openagent.json"
+    if (Test-Path $altConfig) {
+        Ensure-Dir $ConfigDir
+        Copy-Item -Path $altConfig -Destination $omoConfig -Force
+        Write-Ok "Config encontrado en AppData, copiado a $ConfigDir"
+    } else {
+        Write-Fail "OmO no genero oh-my-openagent.json. Revisa la instalacion manualmente."
+        Write-Fail "Docs: https://ohmyopenagent.com/docs"
+        Stop-Transcript | Out-Null
+        exit 1
+    }
+}
+
+# Leer y parsear el config generado por OmO
+$jsonRaw = [System.IO.File]::ReadAllText($omoConfig)
+$config = $jsonRaw | ConvertFrom-Json
+
+# Parchear variants de modelos Claude via github-copilot/ proxy
+# El proxy de Copilot no soporta effort "max", solo low/medium/high
+$claudeMaxPatched = 0
+
+function Patch-ClaudeVariants($obj) {
+    if ($null -eq $obj) { return }
+
+    # Parchear modelo principal
+    if ($obj.PSObject.Properties.Name -contains 'model' -and
+        $obj.PSObject.Properties.Name -contains 'variant') {
+        if ($obj.model -match '^github-copilot/claude' -and $obj.variant -eq 'max') {
+            $obj.variant = 'high'
+            $script:claudeMaxPatched++
+        }
+    }
+
+    # Parchear fallback_models
+    if ($obj.PSObject.Properties.Name -contains 'fallback_models' -and $null -ne $obj.fallback_models) {
+        foreach ($fb in $obj.fallback_models) {
+            if ($fb.PSObject.Properties.Name -contains 'model' -and
+                $fb.PSObject.Properties.Name -contains 'variant') {
+                if ($fb.model -match '^github-copilot/claude' -and $fb.variant -eq 'max') {
+                    $fb.variant = 'high'
+                    $script:claudeMaxPatched++
+                }
+            }
+        }
+    }
+}
+
+# Parchear agents
+if ($config.PSObject.Properties.Name -contains 'agents') {
+    foreach ($prop in $config.agents.PSObject.Properties) {
+        Patch-ClaudeVariants $prop.Value
+    }
+}
+
+# Parchear categories
+if ($config.PSObject.Properties.Name -contains 'categories') {
+    foreach ($prop in $config.categories.PSObject.Properties) {
+        Patch-ClaudeVariants $prop.Value
+    }
+}
+
+if ($claudeMaxPatched -gt 0) {
+    Write-Ok "$claudeMaxPatched variant(s) 'max' -> 'high' en modelos github-copilot/claude-*"
+} else {
+    Write-Ok "Sin variants 'max' en modelos Copilot/Claude (nada que parchear)"
+}
+
+# Serializar y guardar
+$patchedJson = $config | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($omoConfig, $patchedJson)
+Write-Ok "Config parcheado: $omoConfig"
+
+# Distribuir a rutas alternativas
 Ensure-Dir $AppDataOC
-Copy-ConfigFile "oh-my-openagent.json" (Join-Path $AppDataOC "oh-my-openagent.json")
+Copy-Item -Path $omoConfig -Destination (Join-Path $AppDataOC "oh-my-openagent.json") -Force
+Write-Ok "Copia: $(Join-Path $AppDataOC 'oh-my-openagent.json')"
 
-# Copia de referencia en el perfil aislado
-Copy-ConfigFile "oh-my-openagent.json" (Join-Path $OmoProfileDir "oh-my-openagent.json")
+Ensure-Dir $OmoProfileDir
+Copy-Item -Path $omoConfig -Destination (Join-Path $OmoProfileDir "oh-my-openagent.json") -Force
+Write-Ok "Copia: $(Join-Path $OmoProfileDir 'oh-my-openagent.json')"
 
 # =========================================================
 #  PASO 5: Aplicar parche ZWSP
