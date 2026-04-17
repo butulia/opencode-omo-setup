@@ -13,10 +13,10 @@
 #
 #  Que hace:
 #    1. Valida prerequisitos
-#    2. Instala oh-my-opencode via npm
-#    3. Ejecuta el instalador de OmO (copilot-only)
+#    2. Comprueba version de oh-my-opencode (instala/actualiza si procede)
+#    3. Ejecuta el instalador de OmO con los proveedores elegidos
 #    4. Crea perfil aislado (no toca la instalacion principal)
-#    5. Distribuye la config de agentes/modelos
+#    5. Parchea variants de Claude en proxy Copilot y distribuye config
 #    6. Aplica el parche ZWSP (bug conocido en agent names)
 #    7. Crea launcher en Desktop + script de re-parcheo
 # =========================================================
@@ -141,10 +141,10 @@ foreach ($f in $requiredConfigs) {
 }
 
 # =========================================================
-#  PASO 1: Instalar oh-my-opencode via npm
+#  PASO 1: Comprobar / instalar oh-my-opencode via npm
 # =========================================================
 
-Write-Step "Instalando oh-my-opencode via npm..."
+Write-Step "Comprobando oh-my-opencode..."
 
 Ensure-Dir $ConfigDir
 
@@ -156,14 +156,69 @@ if (-not (Test-Path $pkgJson)) {
     Write-Ok "package.json creado en $ConfigDir"
 }
 
-Push-Location $ConfigDir
+# Detectar version instalada localmente
+$installedVersion = $null
+$omoLocalPkg = Join-Path $ConfigDir "node_modules\oh-my-opencode\package.json"
+if (Test-Path $omoLocalPkg) {
+    try {
+        $omoLocalMeta = [System.IO.File]::ReadAllText($omoLocalPkg) | ConvertFrom-Json
+        $installedVersion = $omoLocalMeta.version
+        Write-Ok "Version instalada: v$installedVersion"
+    } catch {
+        Write-Warn "No se pudo leer la version instalada"
+    }
+}
+
+# Consultar version mas reciente en el registro npm
+$latestVersion = $null
 try {
-    & npm install oh-my-opencode@latest 2>&1 | Out-Null
-    Write-Ok "oh-my-opencode instalado en $ConfigDir\node_modules"
+    $latestVersion = (& npm view oh-my-opencode version 2>&1).ToString().Trim()
+    if ($latestVersion -match '^\d+\.\d+') {
+        Write-Ok "Ultima version en npm: v$latestVersion"
+    } else {
+        # Respuesta inesperada (error, aviso, etc.)
+        $latestVersion = $null
+        Write-Warn "No se pudo determinar la ultima version en npm"
+    }
 } catch {
-    Write-Warn "npm install fallo: $_. Continuando (el plugin se descargara via cache)..."
-} finally {
-    Pop-Location
+    Write-Warn "No se pudo consultar npm registry"
+}
+
+# Decidir si instalar
+$needsInstall = $false
+
+if ($null -eq $installedVersion) {
+    Write-Ok "oh-my-opencode no esta instalado. Se instalara."
+    $needsInstall = $true
+} elseif ($null -ne $latestVersion -and $installedVersion -ne $latestVersion) {
+    Write-Host ""
+    Write-Host "    Nueva version disponible: v$installedVersion -> v$latestVersion" -ForegroundColor Yellow
+    $updateChoice = Read-Host "    Actualizar a la ultima version? (S/n)"
+    if ($updateChoice -eq '' -or $updateChoice -eq 's' -or $updateChoice -eq 'S') {
+        $needsInstall = $true
+    } else {
+        Write-Ok "Manteniendo version actual v$installedVersion"
+    }
+} else {
+    Write-Ok "oh-my-opencode esta actualizado (v$installedVersion)"
+}
+
+if ($needsInstall) {
+    Push-Location $ConfigDir
+    try {
+        & npm install oh-my-opencode@latest 2>&1 | Out-Null
+        # Releer version tras instalar
+        if (Test-Path $omoLocalPkg) {
+            $omoLocalMeta = [System.IO.File]::ReadAllText($omoLocalPkg) | ConvertFrom-Json
+            Write-Ok "oh-my-opencode v$($omoLocalMeta.version) instalado en $ConfigDir\node_modules"
+        } else {
+            Write-Ok "oh-my-opencode instalado en $ConfigDir\node_modules"
+        }
+    } catch {
+        Write-Warn "npm install fallo: $_. Continuando (el plugin se descargara via cache)..."
+    } finally {
+        Pop-Location
+    }
 }
 
 # =========================================================
