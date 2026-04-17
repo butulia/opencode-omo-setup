@@ -97,7 +97,6 @@ Remove-SafeItem $DataDir "~\.local\share\opencode-omo\"
 Write-Step "Eliminando archivos del Desktop..."
 Remove-SafeItem (Join-Path $DesktopDir "OpenCode-OmO.bat") "OpenCode-OmO.bat"
 Remove-SafeItem (Join-Path $DesktopDir "OmO-repatch-ZWSP.ps1") "OmO-repatch-ZWSP.ps1"
-Remove-SafeItem (Join-Path $DesktopDir "OmO-Setup-Reference.md") "OmO-Setup-Reference.md"
 
 # ---- npm package (opcional) ----
 Write-Step "Paquete npm oh-my-opencode..."
