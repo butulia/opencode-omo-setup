@@ -172,33 +172,71 @@ try {
 
 Write-Step "Selecciona las suscripciones que tienes disponibles..."
 Write-Host ""
-Write-Host "    [1] GitHub Copilot" -ForegroundColor White
-Write-Host "    [2] Claude (Anthropic)" -ForegroundColor White
-Write-Host "    [3] OpenAI" -ForegroundColor White
-Write-Host "    [4] Gemini (Google)" -ForegroundColor White
+Write-Host "    Proveedores nativos:" -ForegroundColor DarkGray
+Write-Host "    [1] Claude (Anthropic)       - anthropic/ models (Opus, Sonnet, Haiku)" -ForegroundColor White
+Write-Host "    [2] OpenAI / ChatGPT         - openai/ models (GPT-5.4 for Oracle)" -ForegroundColor White
+Write-Host "    [3] Gemini (Google)           - google/ models (Gemini 3.1 Pro, Flash)" -ForegroundColor White
 Write-Host ""
-$selection = Read-Host "    Introduce los numeros separados por comas (ej: 1,3)"
+Write-Host "    Proveedores proxy:" -ForegroundColor DarkGray
+Write-Host "    [4] GitHub Copilot           - github-copilot/ models (fallback)" -ForegroundColor White
+Write-Host "    [5] OpenCode Zen             - opencode/ models (opencode/claude-opus-4-6, etc.)" -ForegroundColor White
+Write-Host "    [6] Z.ai Coding Plan         - zai-coding-plan/glm-5 (visual-engineering fallback)" -ForegroundColor White
+Write-Host "    [7] Kimi For Coding          - kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)" -ForegroundColor White
+Write-Host "    [8] OpenCode Go              - opencode/ models" -ForegroundColor White
+Write-Host "    [9] Vercel AI Gateway        - vercel/ models (universal proxy, always last fallback)" -ForegroundColor White
+Write-Host ""
+Write-Host "    Prioridad de modelos: Nativo > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel" -ForegroundColor DarkGray
+Write-Host ""
+$selection = Read-Host "    Introduce los numeros separados por comas (ej: 1,4)"
 
-$copilotFlag = "no"
-$claudeFlag  = "no"
-$openaiFlag  = "no"
-$geminiFlag  = "no"
+# Nota: Claude acepta 'yes' o 'max20'; el resto solo 'yes'/'no'
+$claudeFlag     = "no"
+$openaiFlag     = "no"
+$geminiFlag     = "no"
+$copilotFlag    = "no"
+$zenFlag        = "no"
+$zaiFlag        = "no"
+$kimiFlag       = "no"
+$goFlag         = "no"
+$vercelFlag     = "no"
 
 $choices = $selection -split ',' | ForEach-Object { $_.Trim() }
 foreach ($c in $choices) {
     switch ($c) {
-        "1" { $copilotFlag = "yes" }
-        "2" { $claudeFlag  = "yes" }
-        "3" { $openaiFlag  = "yes" }
-        "4" { $geminiFlag  = "yes" }
+        "1" { $claudeFlag  = "yes" }
+        "2" { $openaiFlag  = "yes" }
+        "3" { $geminiFlag  = "yes" }
+        "4" { $copilotFlag = "yes" }
+        "5" { $zenFlag     = "yes" }
+        "6" { $zaiFlag     = "yes" }
+        "7" { $kimiFlag    = "yes" }
+        "8" { $goFlag      = "yes" }
+        "9" { $vercelFlag  = "yes" }
+    }
+}
+
+# Si eligio Claude, preguntar si tiene plan max20
+if ($claudeFlag -eq "yes") {
+    Write-Host ""
+    $claudeTier = Read-Host "    Tienes el plan Claude Max 20 msgs/day? (s/N)"
+    if ($claudeTier -eq "s" -or $claudeTier -eq "S") {
+        $claudeFlag = "max20"
+        Write-Ok "Claude: max20"
+    } else {
+        Write-Ok "Claude: yes"
     }
 }
 
 $enabled = @()
-if ($copilotFlag -eq "yes") { $enabled += "GitHub Copilot" }
-if ($claudeFlag  -eq "yes") { $enabled += "Claude" }
+if ($claudeFlag  -ne "no") { $enabled += "Claude=$claudeFlag" }
 if ($openaiFlag  -eq "yes") { $enabled += "OpenAI" }
 if ($geminiFlag  -eq "yes") { $enabled += "Gemini" }
+if ($copilotFlag -eq "yes") { $enabled += "GitHub Copilot" }
+if ($zenFlag     -eq "yes") { $enabled += "OpenCode Zen" }
+if ($zaiFlag     -eq "yes") { $enabled += "Z.ai" }
+if ($kimiFlag    -eq "yes") { $enabled += "Kimi" }
+if ($goFlag      -eq "yes") { $enabled += "OpenCode Go" }
+if ($vercelFlag  -eq "yes") { $enabled += "Vercel" }
 
 if ($enabled.Count -eq 0) {
     Write-Fail "No se selecciono ninguna suscripcion. Abortando."
@@ -208,11 +246,36 @@ if ($enabled.Count -eq 0) {
 
 Write-Ok "Suscripciones: $($enabled -join ', ')"
 
+# Preguntar por --skip-auth
+Write-Host ""
+$skipAuth = Read-Host "    Omitir instrucciones de autenticacion? (s/N)"
+$skipAuthFlag = ""
+if ($skipAuth -eq "s" -or $skipAuth -eq "S") {
+    $skipAuthFlag = "--skip-auth"
+    Write-Ok "Skip auth: si"
+} else {
+    Write-Ok "Skip auth: no"
+}
+
 Write-Step "Ejecutando instalador de OmO..."
+
+$installArgs = @(
+    "oh-my-opencode", "install", "--no-tui",
+    "--claude=$claudeFlag",
+    "--openai=$openaiFlag",
+    "--gemini=$geminiFlag",
+    "--copilot=$copilotFlag",
+    "--opencode-zen=$zenFlag",
+    "--zai-coding-plan=$zaiFlag",
+    "--kimi-for-coding=$kimiFlag",
+    "--opencode-go=$goFlag",
+    "--vercel-ai-gateway=$vercelFlag"
+)
+if ($skipAuthFlag -ne "") { $installArgs += $skipAuthFlag }
 
 Push-Location $ConfigDir
 try {
-    & npx oh-my-opencode install --no-tui --copilot=$copilotFlag --claude=$claudeFlag --openai=$openaiFlag --gemini=$geminiFlag --skip-auth 2>&1 | Out-Null
+    & npx @installArgs 2>&1 | Out-Null
     Write-Ok "Instalador OmO completado"
 } catch {
     Write-Warn "El instalador OmO reporto un error: $_. Continuando con setup manual..."
