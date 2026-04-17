@@ -1,11 +1,17 @@
 #Requires -Version 5.1
 # =========================================================
-#  OmO ZWSP Re-Patch Script
-#  Removes Zero-Width Space (U+200B) characters from
-#  AGENT_LIST_SORT_PREFIXES in oh-my-openagent's dist/index.js
+#  OmO Re-Patch Script
+#  Applies known patches to oh-my-openagent's dist/index.js:
 #
-#  Run this after OmO updates to fix the agent name mismatch bug.
-#  Issue refs: oh-my-openagent #3379, #3418, #3281
+#  1. ZWSP: Removes Zero-Width Space (U+200B) from
+#     AGENT_LIST_SORT_PREFIXES (agent name mismatch bug)
+#     Issue refs: oh-my-openagent #3379, #3418, #3281
+#
+#  2. Variant: Replaces variant:"max" -> "high" in hardcoded
+#     Claude model defaults when Anthropic nativo no disponible
+#     (el proxy de Copilot no soporta effort "max")
+#
+#  Run this after OmO updates to re-apply patches.
 #
 #  Uso:
 #    Click derecho > Ejecutar con PowerShell
@@ -20,14 +26,30 @@ $paths = @(
     (Join-Path $UserHome ".config\opencode\node_modules\oh-my-opencode\dist\index.js")
 )
 
-$zwspChar = [char]0x200B
+$zwspChar   = [char]0x200B
 $patchCount = 0
-$skipCount = 0
+$skipCount  = 0
+
+# Detectar si el usuario tiene Anthropic nativo (mirando el config JSON)
+$hasNativeAnthropic = $false
+$configPath = Join-Path $UserHome ".config\opencode\oh-my-openagent.json"
+if (Test-Path $configPath) {
+    $configText = [System.IO.File]::ReadAllText($configPath)
+    if ($configText -match '"anthropic/') {
+        $hasNativeAnthropic = $true
+    }
+}
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor White
-Write-Host "  OmO ZWSP Re-Patch" -ForegroundColor White
+Write-Host "  OmO Re-Patch (ZWSP + Variant)" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor White
+
+if ($hasNativeAnthropic) {
+    Write-Host "  Anthropic nativo detectado: variant 'max' no se parchea" -ForegroundColor Gray
+} else {
+    Write-Host "  Sin Anthropic nativo: variant 'max' -> 'high'" -ForegroundColor Gray
+}
 
 foreach ($path in $paths) {
     $shortPath = $path.Replace($UserHome, "~")
@@ -40,36 +62,55 @@ foreach ($path in $paths) {
         continue
     }
 
-    $content = [System.IO.File]::ReadAllText($path)
+    $content  = [System.IO.File]::ReadAllText($path)
+    $modified = $false
 
-    if (-not $content.Contains($zwspChar)) {
-        Write-Host "    OK: Sin ZWSP (ya parcheado o upstream arreglado)" -ForegroundColor Green
-        $skipCount++
-        continue
-    }
+    # ---- Parche 1: ZWSP ----
+    if ($content.Contains($zwspChar)) {
+        $pattern = '(?s)(AGENT_LIST_SORT_PREFIXES\s*=\s*\{)(.*?)(\})'
+        $match   = [regex]::Match($content, $pattern)
 
-    $pattern = '(?s)(AGENT_LIST_SORT_PREFIXES\s*=\s*\{)(.*?)(\})'
-    $match = [regex]::Match($content, $pattern)
+        if ($match.Success) {
+            $originalBlock = $match.Value
+            $cleanedBlock  = $originalBlock.Replace([string]$zwspChar, '')
 
-    if ($match.Success) {
-        $originalBlock = $match.Value
-        $cleanedBlock = $originalBlock.Replace([string]$zwspChar, '')
-
-        if ($originalBlock -ne $cleanedBlock) {
-            $content = $content.Remove($match.Index, $match.Length).Insert($match.Index, $cleanedBlock)
-            [System.IO.File]::WriteAllText($path, $content)
-            Write-Host "    PARCHEADO: ZWSP eliminado de AGENT_LIST_SORT_PREFIXES" -ForegroundColor Green
-            $patchCount++
+            if ($originalBlock -ne $cleanedBlock) {
+                $content  = $content.Remove($match.Index, $match.Length).Insert($match.Index, $cleanedBlock)
+                $modified = $true
+                Write-Host "    ZWSP: Parcheado (AGENT_LIST_SORT_PREFIXES)" -ForegroundColor Green
+            } else {
+                Write-Host "    ZWSP: Bloque encontrado pero ya limpio" -ForegroundColor Green
+            }
         } else {
-            Write-Host "    OK: Bloque encontrado pero ya limpio" -ForegroundColor Green
-            $skipCount++
+            # Fallback: remover ZWSP globalmente
+            $content  = $content.Replace([string]$zwspChar, '')
+            $modified = $true
+            Write-Host "    ZWSP: Parcheado (limpieza global)" -ForegroundColor Green
         }
     } else {
-        Write-Host "    WARN: ZWSP encontrado pero bloque no coincide. Limpieza global..." -ForegroundColor Yellow
-        $cleaned = $content.Replace([string]$zwspChar, '')
-        [System.IO.File]::WriteAllText($path, $cleaned)
-        Write-Host "    PARCHEADO: Limpieza global de ZWSP aplicada" -ForegroundColor Green
+        Write-Host "    ZWSP: OK (sin ZWSP)" -ForegroundColor Green
+    }
+
+    # ---- Parche 2: variant "max" -> "high" ----
+    if (-not $hasNativeAnthropic) {
+        $variantPattern = '(variant:\s*)"max"'
+        $hits = [regex]::Matches($content, $variantPattern)
+
+        if ($hits.Count -gt 0) {
+            $content  = [regex]::Replace($content, $variantPattern, '${1}"high"')
+            $modified = $true
+            Write-Host "    VARIANT: $($hits.Count) ocurrencia(s) 'max' -> 'high'" -ForegroundColor Green
+        } else {
+            Write-Host "    VARIANT: OK (sin 'max' hardcodeado)" -ForegroundColor Green
+        }
+    }
+
+    # ---- Escribir si hubo cambios ----
+    if ($modified) {
+        [System.IO.File]::WriteAllText($path, $content)
         $patchCount++
+    } else {
+        $skipCount++
     }
 }
 

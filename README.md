@@ -38,7 +38,7 @@ Al terminar, hacer doble clic en `OpenCode-OmO.bat` en el Escritorio.
 | Archivo | Funcion |
 |---|---|
 | `install-omo.ps1` | Instalador principal |
-| `repatch-zwsp.ps1` | Re-aplicar parche ZWSP despues de actualizaciones de OmO |
+| `repatch-zwsp.ps1` | Re-aplicar parches (ZWSP + variant) despues de actualizaciones de OmO |
 | `uninstall-omo.ps1` | Desinstalador limpio (revierte todo) |
 | `config/opencode.json` | Registro del plugin OmO para el perfil aislado |
 
@@ -64,7 +64,7 @@ Prioridad de modelos: Nativo > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel.
 powershell -ExecutionPolicy Bypass -File repatch-zwsp.ps1
 ```
 
-O click derecho en `OmO-repatch-ZWSP.ps1` en el Escritorio > Ejecutar con PowerShell.
+O click derecho en `OmO-repatch.ps1` en el Escritorio > Ejecutar con PowerShell.
 
 ## Desinstalar
 

@@ -570,10 +570,10 @@ Copy-Item -Path $omoConfig -Destination (Join-Path $OmoProfileDir "oh-my-openage
 Write-Ok "Copia: $(Join-Path $OmoProfileDir 'oh-my-openagent.json')"
 
 # =========================================================
-#  PASO 5: Aplicar parche ZWSP
+#  PASO 5: Aplicar parches en dist/index.js (ZWSP + variant)
 # =========================================================
 
-Write-Step "Aplicando parche ZWSP (Zero-Width Space)..."
+Write-Step "Aplicando parches en dist/index.js..."
 
 # Bug: OmO prefixa nombres de agentes con U+200B para ordenar en la UI.
 # Esto causa que los lookups fallen (nombre registrado != nombre buscado).
@@ -625,7 +625,48 @@ foreach ($target in $patchTargets) {
 }
 
 if ($patchedCount -eq 0) {
-    Write-Ok "No se requirio parcheo (ya limpio o upstream arreglado)"
+    Write-Ok "ZWSP: ya limpio (o upstream arreglado)"
+}
+
+# ---- Parche variant "max" -> "high" en defaults hardcodeados ----
+# OmO hardcodea variant:"max" en AGENT_MODEL_REQUIREMENTS,
+# CATEGORY_MODEL_REQUIREMENTS y ANTHROPIC_CATEGORIES para modelos Claude.
+# Si no hay Anthropic nativo, esos modelos se resuelven via proxy
+# (github-copilot/) que NO soporta effort "max".
+# El hook createAnthropicEffortHook salta para github-copilot,
+# asi que "max" pasa sin clampear al proxy.
+
+if ($claudeFlag -eq "no") {
+    $variantPatchCount = 0
+
+    foreach ($target in $patchTargets) {
+        $shortName = $target.Replace($UserHome, "~")
+
+        if (-not (Test-Path $target)) { continue }
+
+        $content = [System.IO.File]::ReadAllText($target)
+
+        $variantPattern = '(variant:\s*)"max"'
+        $hits = [regex]::Matches($content, $variantPattern)
+
+        if ($hits.Count -eq 0) {
+            Write-Ok "Variant: sin 'max' hardcodeado en $shortName"
+            continue
+        }
+
+        $patched = [regex]::Replace($content, $variantPattern, '${1}"high"')
+        [System.IO.File]::WriteAllText($target, $patched)
+        Write-Ok "Variant: $($hits.Count) 'max' -> 'high' en $shortName"
+        $variantPatchCount += $hits.Count
+    }
+
+    if ($variantPatchCount -gt 0) {
+        Write-Ok "Total: $variantPatchCount variant(s) parcheado(s) en dist/index.js"
+    } else {
+        Write-Ok "Variant: ya parcheado (o upstream actualizado)"
+    }
+} else {
+    Write-Ok "Anthropic nativo: variant 'max' valido en dist/index.js (no se parchea)"
 }
 
 # =========================================================
@@ -674,7 +715,7 @@ Write-Ok "Launcher: $launcherPath"
 Write-Step "Copiando script de re-parcheo a Desktop..."
 
 $repatchSrc = Join-Path $ScriptRoot "repatch-zwsp.ps1"
-$repatchDst = Join-Path $DesktopDir "OmO-repatch-ZWSP.ps1"
+$repatchDst = Join-Path $DesktopDir "OmO-repatch.ps1"
 
 if (Test-Path $repatchSrc) {
     Copy-Item -Path $repatchSrc -Destination $repatchDst -Force
@@ -701,7 +742,7 @@ Write-Host "  Siguiente paso: doble clic en 'OpenCode-OmO.bat' en el Escritorio"
 Write-Host "  El agente por defecto sera 'Sisyphus - Ultraworker'" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Despues de actualizaciones de OmO:" -ForegroundColor Yellow
-Write-Host "  -> Click derecho en 'OmO-repatch-ZWSP.ps1' > Ejecutar con PowerShell" -ForegroundColor Yellow
+Write-Host "  -> Click derecho en 'OmO-repatch.ps1' > Ejecutar con PowerShell" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Documentacion: https://ohmyopenagent.com/docs" -ForegroundColor Gray
 Write-Host "  Log de resultados: $LogFile" -ForegroundColor Gray
