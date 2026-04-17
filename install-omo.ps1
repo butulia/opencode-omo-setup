@@ -16,7 +16,7 @@
 #    2. Comprueba version de oh-my-opencode (instala/actualiza si procede)
 #    3. Ejecuta el instalador de OmO con los proveedores elegidos
 #    4. Crea perfil aislado (no toca la instalacion principal)
-#    5. Parchea variants de Claude en proxy Copilot y distribuye config
+#    5. Promueve modelos a proveedor nativo segun prioridad, parchea variants y distribuye config
 #    6. Aplica el parche ZWSP (bug conocido en agent names)
 #    7. Crea launcher en Desktop + script de re-parcheo
 # =========================================================
@@ -357,7 +357,7 @@ if (Test-Path $globalOC) {
 }
 
 # =========================================================
-#  PASO 4: Parchear variants de Claude y distribuir config
+#  PASO 4: Promover a nativo, parchear variants y distribuir config
 # =========================================================
 
 Write-Step "Parcheando oh-my-openagent.json generado por OmO..."
@@ -383,8 +383,130 @@ if (-not (Test-Path $omoConfig)) {
 $jsonRaw = [System.IO.File]::ReadAllText($omoConfig)
 $config = $jsonRaw | ConvertFrom-Json
 
+# ---- Promover modelos github-copilot/* a proveedor nativo ----
+# Prioridad: Nativo > Copilot. Si el usuario tiene suscripcion nativa
+# para una familia de modelos, se usa el prefijo nativo como primary y
+# se conserva github-copilot/ como fallback (red de seguridad).
+
+$nativeProviderMap = @{}
+if ($openaiFlag -eq "yes")  { $nativeProviderMap["gpt-"]    = "openai" }
+if ($claudeFlag -ne "no")   { $nativeProviderMap["claude-"] = "anthropic" }
+if ($geminiFlag -eq "yes")  { $nativeProviderMap["gemini-"] = "google" }
+
+$nativePromoted    = 0
+$duplicatesRemoved = 0
+
+if ($nativeProviderMap.Count -gt 0) {
+
+    $copilotPfx = "github-copilot/"
+
+    function Resolve-NativeModel([string]$model) {
+        if (-not $model.StartsWith($script:copilotPfx)) { return $null }
+        $base = $model.Substring($script:copilotPfx.Length)
+        foreach ($family in $script:nativeProviderMap.Keys) {
+            if ($base.StartsWith($family)) {
+                return "$($script:nativeProviderMap[$family])/$base"
+            }
+        }
+        return $null
+    }
+
+    function Promote-EntryModels($entry) {
+        if ($null -eq $entry) { return }
+        if (-not ($entry.PSObject.Properties.Name -contains 'model')) { return }
+
+        $primary     = $entry.model
+        $primaryBase = $null
+        if ($primary.StartsWith($script:copilotPfx)) {
+            $primaryBase = $primary.Substring($script:copilotPfx.Length)
+        }
+
+        $hasFB = ($entry.PSObject.Properties.Name -contains 'fallback_models' -and
+                  $null -ne $entry.fallback_models)
+        [array]$fallbacks = @()
+        if ($hasFB) { $fallbacks = @($entry.fallback_models) }
+
+        # 1. Promover primary
+        $primaryNative     = Resolve-NativeModel $primary
+        $didPromotePrimary = $false
+        if ($primaryNative) {
+            $entry.model       = $primaryNative
+            $didPromotePrimary = $true
+            $script:nativePromoted++
+        }
+
+        # 2. Procesar fallbacks
+        if ($fallbacks.Count -gt 0) {
+            $kept      = [System.Collections.ArrayList]::new()
+            $proxyKept = $false
+
+            foreach ($fb in $fallbacks) {
+                $fbModel = $fb.model
+
+                # a) Identico al primary ya promovido -> duplicado, eliminar
+                if ($didPromotePrimary -and $fbModel -eq $entry.model) {
+                    $script:duplicatesRemoved++
+                    continue
+                }
+
+                # b) Version copilot del mismo modelo base que el primary promovido
+                #    -> conservar el primero como fallback proxy
+                if ($didPromotePrimary -and $primaryBase -and
+                    $fbModel -eq "$($script:copilotPfx)$primaryBase") {
+                    if (-not $proxyKept) {
+                        $proxyKept = $true
+                        [void]$kept.Add($fb)
+                    } else {
+                        $script:duplicatesRemoved++
+                    }
+                    continue
+                }
+
+                # c) Modelo copilot de otra familia -> promover si hay nativo
+                $fbNative = Resolve-NativeModel $fbModel
+                if ($fbNative) {
+                    $fb.model = $fbNative
+                    $script:nativePromoted++
+                }
+
+                [void]$kept.Add($fb)
+            }
+
+            if ($kept.Count -gt 0) {
+                $entry.fallback_models = @($kept.ToArray())
+            } elseif ($hasFB) {
+                $entry.PSObject.Properties.Remove('fallback_models')
+            }
+        }
+    }
+
+    # Aplicar a agents
+    if ($config.PSObject.Properties.Name -contains 'agents') {
+        foreach ($prop in $config.agents.PSObject.Properties) {
+            Promote-EntryModels $prop.Value
+        }
+    }
+
+    # Aplicar a categories
+    if ($config.PSObject.Properties.Name -contains 'categories') {
+        foreach ($prop in $config.categories.PSObject.Properties) {
+            Promote-EntryModels $prop.Value
+        }
+    }
+
+    if ($nativePromoted -gt 0 -or $duplicatesRemoved -gt 0) {
+        Write-Ok "$nativePromoted modelo(s) promovido(s) a proveedor nativo, $duplicatesRemoved duplicado(s) eliminado(s)"
+    } else {
+        Write-Ok "Sin modelos github-copilot/* promovibles a nativo"
+    }
+} else {
+    Write-Ok "Sin proveedores nativos seleccionados (nada que promover)"
+}
+
 # Parchear variants de modelos Claude via github-copilot/ proxy
 # El proxy de Copilot no soporta effort "max", solo low/medium/high
+# NOTA: se ejecuta DESPUES de la promocion a nativo; los modelos ya
+# promovidos a anthropic/ SI soportan "max" y no se tocan aqui.
 $claudeMaxPatched = 0
 
 function Patch-ClaudeVariants($obj) {
