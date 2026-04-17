@@ -167,14 +167,52 @@ try {
 }
 
 # =========================================================
-#  PASO 2: Ejecutar instalador de OmO
+#  PASO 2: Seleccionar suscripciones y ejecutar instalador
 # =========================================================
 
-Write-Step 'Ejecutando instalador de OmO (--copilot=yes)...'
+Write-Step "Selecciona las suscripciones que tienes disponibles..."
+Write-Host ""
+Write-Host "    [1] GitHub Copilot" -ForegroundColor White
+Write-Host "    [2] Claude (Anthropic)" -ForegroundColor White
+Write-Host "    [3] OpenAI" -ForegroundColor White
+Write-Host "    [4] Gemini (Google)" -ForegroundColor White
+Write-Host ""
+$selection = Read-Host "    Introduce los numeros separados por comas (ej: 1,3)"
+
+$copilotFlag = "no"
+$claudeFlag  = "no"
+$openaiFlag  = "no"
+$geminiFlag  = "no"
+
+$choices = $selection -split ',' | ForEach-Object { $_.Trim() }
+foreach ($c in $choices) {
+    switch ($c) {
+        "1" { $copilotFlag = "yes" }
+        "2" { $claudeFlag  = "yes" }
+        "3" { $openaiFlag  = "yes" }
+        "4" { $geminiFlag  = "yes" }
+    }
+}
+
+$enabled = @()
+if ($copilotFlag -eq "yes") { $enabled += "GitHub Copilot" }
+if ($claudeFlag  -eq "yes") { $enabled += "Claude" }
+if ($openaiFlag  -eq "yes") { $enabled += "OpenAI" }
+if ($geminiFlag  -eq "yes") { $enabled += "Gemini" }
+
+if ($enabled.Count -eq 0) {
+    Write-Fail "No se selecciono ninguna suscripcion. Abortando."
+    Stop-Transcript | Out-Null
+    exit 1
+}
+
+Write-Ok "Suscripciones: $($enabled -join ', ')"
+
+Write-Step "Ejecutando instalador de OmO..."
 
 Push-Location $ConfigDir
 try {
-    & npx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes --skip-auth 2>&1 | Out-Null
+    & npx oh-my-opencode install --no-tui --copilot=$copilotFlag --claude=$claudeFlag --openai=$openaiFlag --gemini=$geminiFlag --skip-auth 2>&1 | Out-Null
     Write-Ok "Instalador OmO completado"
 } catch {
     Write-Warn "El instalador OmO reporto un error: $_. Continuando con setup manual..."
@@ -350,6 +388,7 @@ Write-Host ""
 Write-Host "  Despues de actualizaciones de OmO:" -ForegroundColor Yellow
 Write-Host "  -> Click derecho en 'OmO-repatch-ZWSP.ps1' > Ejecutar con PowerShell" -ForegroundColor Yellow
 Write-Host ""
+Write-Host "  Documentacion: https://ohmyopenagent.com/docs" -ForegroundColor Gray
 Write-Host "  Log de resultados: $LogFile" -ForegroundColor Gray
 Write-Host ""
 
