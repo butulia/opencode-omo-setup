@@ -50,16 +50,17 @@ $jsonPath = Resolve-OpencodeJsonPath
 Write-Step "Elige como quieres conectar con Azure DevOps..."
 Write-Host ""
 Write-Host "    [1] Local (recomendado)" -ForegroundColor White
-Write-Host "        El servidor MCP se ejecuta en tu maquina via npx." -ForegroundColor Gray
-Write-Host "        La autenticacion se hace via navegador (login con tu" -ForegroundColor Gray
-Write-Host "        cuenta Microsoft) la primera vez que uses una herramienta." -ForegroundColor Gray
-Write-Host ""
-Write-Host "        Necesitaras tener a mano:" -ForegroundColor Yellow
-Write-Host "          - El nombre de tu organizacion en Azure DevOps" -ForegroundColor Yellow
-Write-Host "            (lo encuentras en https://dev.azure.com/<AQUI>)" -ForegroundColor Yellow
-Write-Host "          - Acceso a un navegador para el login inicial" -ForegroundColor Yellow
-Write-Host "          - Tu cuenta Microsoft debe tener acceso a la org" -ForegroundColor Yellow
-Write-Host ""
+    Write-Host "        El servidor MCP se ejecuta en tu maquina via npx." -ForegroundColor Gray
+    Write-Host "        Soporta tres metodos de autenticacion:" -ForegroundColor Gray
+    Write-Host "          - Interactivo: via navegador (cuenta profesional/educativa)" -ForegroundColor Gray
+    Write-Host "          - PAT: Personal Access Token (cualquier cuenta)" -ForegroundColor Gray
+    Write-Host "          - EnvVar: Variable de entorno (alternativa simple)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "        Necesitaras tener a mano:" -ForegroundColor Yellow
+    Write-Host "          - El nombre de tu organizacion en Azure DevOps" -ForegroundColor Yellow
+    Write-Host "            (lo encuentras en https://dev.azure.com/<AQUI>)" -ForegroundColor Yellow
+    Write-Host "          - Segun el metodo: navegador, PAT token, o cuenta Microsoft" -ForegroundColor Yellow
+    Write-Host ""
 Write-Host "    [2] Remoto (preview)" -ForegroundColor White
 Write-Host "        Servidor MCP alojado por Microsoft. No ejecuta nada" -ForegroundColor Gray
 Write-Host "        en local. Conexion directa al servicio en la nube." -ForegroundColor Gray
@@ -85,6 +86,8 @@ $isLocal = ($modeChoice -eq '1')
 # =========================================================
 
 $serverDef = $null
+$authMethod = $null
+$authNote = ""
 
 if ($isLocal) {
     # ---- MODO LOCAL ----
@@ -101,6 +104,138 @@ if ($isLocal) {
     }
     $orgName = $orgName.Trim()
     Write-Ok "Organizacion: $orgName"
+
+    # =========================================================
+    #  PASO 2b: Elegir metodo de autenticacion
+    # =========================================================
+
+    Write-Step "Elige el metodo de autenticacion..."
+    Write-Host ""
+    Write-Host "    [1] Interactivo (navegador)" -ForegroundColor White
+    Write-Host "        Abre el navegador para autenticarte con tu cuenta Microsoft." -ForegroundColor Gray
+    Write-Host "        Requiere cuenta profesional o educativa (Microsoft Entra ID)." -ForegroundColor Gray
+    Write-Host "        No funciona con cuentas personales (@outlook, @hotmail, @gmail)." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "    [2] PAT - Personal Access Token (recomendado para cuentas personales)" -ForegroundColor White
+    Write-Host "        Usa un token de acceso personal generado en Azure DevOps." -ForegroundColor Gray
+    Write-Host "        Compatible con cualquier tipo de cuenta." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "    [3] EnvVar - Variable de entorno (alternativa simple)" -ForegroundColor White
+    Write-Host "        Similar a PAT pero con configuracion ligeramente diferente." -ForegroundColor Gray
+    Write-Host ""
+
+    $authChoice = Read-Host "    Selecciona [1], [2] o [3]"
+    while ($authChoice -ne '1' -and $authChoice -ne '2' -and $authChoice -ne '3') {
+        $authChoice = Read-Host "    Opcion no valida. Selecciona [1], [2] o [3]"
+    }
+
+    $authMethod = switch ($authChoice) {
+        '1' { 'interactive' }
+        '2' { 'pat' }
+        '3' { 'envvar' }
+    }
+
+    Write-Ok "Metodo de autenticacion: $authMethod"
+
+    # =========================================================
+    #  PASO 2c: Configuracion especifica del metodo de auth
+    # =========================================================
+
+    $environment = $null
+    $authNote = ""
+
+    if ($authMethod -eq 'pat') {
+        Write-Step "Configuracion PAT (Personal Access Token)..."
+        Write-Host ""
+        Write-Host "    Para generar un PAT:" -ForegroundColor Yellow
+        Write-Host "    1. Ve a https://dev.azure.com/$orgName/_usersSettings/tokens" -ForegroundColor Cyan
+        Write-Host "    2. Haz clic en 'Nuevo token'" -ForegroundColor Gray
+        Write-Host "    3. Nombre: OpenCode MCP (o el que prefieras)" -ForegroundColor Gray
+        Write-Host "    4. Organizacion: Acceso a todas las organizaciones o solo $orgName" -ForegroundColor Gray
+        Write-Host "    5. Expiracion: Elige la duracion (recomendado: 90 dias)" -ForegroundColor Gray
+        Write-Host "    6. Permisos: Selecciona los scopes necesarios:" -ForegroundColor Gray
+        Write-Host "       - Work Items: Read & Write" -ForegroundColor Gray
+        Write-Host "       - Code: Read & Write (si usas repositorios)" -ForegroundColor Gray
+        Write-Host "       - Build: Read (si usas pipelines)" -ForegroundColor Gray
+        Write-Host "    7. Copia el token generado (solo se muestra una vez)" -ForegroundColor Gray
+        Write-Host ""
+
+        # Solicitar email
+        Write-Host "    Introduce el email asociado a tu cuenta de Azure DevOps:" -ForegroundColor White
+        $email = Read-Host "    Email"
+        while (-not $email -or $email.Trim() -eq '') {
+            $email = Read-Host "    El email no puede estar vacio. Email"
+        }
+        $email = $email.Trim()
+
+        # Solicitar PAT
+        Write-Host ""
+        Write-Host "    Introduce el token PAT generado:" -ForegroundColor White
+        $pat = Read-Host "    PAT token" -AsSecureString
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pat)
+        $patPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+        while (-not $patPlain -or $patPlain.Trim() -eq '') {
+            Write-Host "    El token no puede estar vacio." -ForegroundColor Red
+            $pat = Read-Host "    PAT token" -AsSecureString
+            $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pat)
+            $patPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+        }
+
+        # Codificar en base64 como "email:pat"
+        $credentials = "$email`:$patPlain"
+        $encodedToken = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($credentials))
+
+        # Limpiar variables con datos sensibles de memoria
+        $credentials = $null
+        $patPlain = $null
+
+        $environment = [PSCustomObject]@{
+            PERSONAL_ACCESS_TOKEN = $encodedToken
+        }
+
+        Write-Ok "Token codificado correctamente"
+        $authNote = "Autenticacion: PAT (Personal Access Token)"
+    }
+    elseif ($authMethod -eq 'envvar') {
+        Write-Step "Configuracion EnvVar (Variable de entorno)..."
+        Write-Host ""
+        Write-Host "    Para generar un PAT:" -ForegroundColor Yellow
+        Write-Host "    1. Ve a https://dev.azure.com/$orgName/_usersSettings/tokens" -ForegroundColor Cyan
+        Write-Host "    2. Haz clic en 'Nuevo token'" -ForegroundColor Gray
+        Write-Host "    3. Configura los permisos necesarios (Work Items, Code, etc.)" -ForegroundColor Gray
+        Write-Host "    4. Copia el token generado" -ForegroundColor Gray
+        Write-Host ""
+
+        Write-Host "    Introduce el token PAT generado:" -ForegroundColor White
+        $pat = Read-Host "    PAT token" -AsSecureString
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pat)
+        $patPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+        while (-not $patPlain -or $patPlain.Trim() -eq '') {
+            Write-Host "    El token no puede estar vacio." -ForegroundColor Red
+            $pat = Read-Host "    PAT token" -AsSecureString
+            $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pat)
+            $patPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+        }
+
+        $environment = [PSCustomObject]@{
+            ADO_MCP_AUTH_TOKEN = $patPlain
+        }
+
+        # Limpiar
+        $patPlain = $null
+
+        Write-Ok "Token configurado correctamente"
+        $authNote = "Autenticacion: EnvVar (ADO_MCP_AUTH_TOKEN)"
+    }
+    else {
+        $authNote = "Autenticacion: Interactiva (navegador)"
+    }
 
     # Dominios
     Write-Step "Selecciona los dominios que quieres habilitar..."
@@ -158,15 +293,28 @@ if ($isLocal) {
 
     # Construir comando
     $command = @('npx', '-y', '@azure-devops/mcp', $orgName)
+
+    # Añadir flag de autenticacion si no es interactivo
+    if ($authMethod -ne 'interactive') {
+        $command += '--authentication'
+        $command += $authMethod
+    }
+
     if ($selectedDomains.Count -gt 0) {
         $command += '-d'
         $command += $selectedDomains
     }
 
+    # Construir definicion del servidor
     $serverDef = [PSCustomObject]@{
         type    = 'local'
         command = $command
         enabled = $true
+    }
+
+    # Añadir environment si es necesario
+    if ($environment) {
+        $serverDef | Add-Member -NotePropertyName 'environment' -NotePropertyValue $environment
     }
 
 } else {
@@ -270,11 +418,18 @@ foreach ($line in ($previewJson -split "`n")) {
 Write-Host ""
 
 if ($isLocal) {
-    Write-Host "  Siguiente paso:" -ForegroundColor Yellow
-    Write-Host "  La primera vez que uses una herramienta de Azure DevOps en OpenCode," -ForegroundColor Yellow
-    Write-Host "  se abrira el navegador para que te autentiques con tu cuenta Microsoft." -ForegroundColor Yellow
+    Write-Host "  Configuracion:" -ForegroundColor Yellow
+    Write-Host "  $authNote" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  Tu cuenta debe tener acceso a la organizacion '$orgName'." -ForegroundColor Yellow
+    if ($authMethod -eq 'interactive') {
+        Write-Host "  La primera vez que uses una herramienta de Azure DevOps en OpenCode," -ForegroundColor Yellow
+        Write-Host "  se abrira el navegador para que te autentiques con tu cuenta Microsoft." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  Tu cuenta debe tener acceso a la organizacion '$orgName'." -ForegroundColor Yellow
+    } else {
+        Write-Host "  El servidor MCP esta configurado con autenticacion por token." -ForegroundColor Yellow
+        Write-Host "  Puedes empezar a usar las herramientas de Azure DevOps inmediatamente." -ForegroundColor Yellow
+    }
 } else {
     Write-Host "  Siguiente paso:" -ForegroundColor Yellow
     Write-Host "  El servidor MCP remoto esta configurado y listo para usar." -ForegroundColor Yellow

@@ -103,7 +103,10 @@ powershell -ExecutionPolicy Bypass -File uninstall-mcp-azure-devops.ps1
 ```
 
 **Modos de conexion:**
-- **Local (recomendado):** Servidor MCP via npx. Autenticacion via navegador.
+- **Local (recomendado):** Servidor MCP via npx.
+  - **Autenticacion interactiva (navegador):** Para cuentas profesionales/educativas (Microsoft Entra ID). No funciona con cuentas personales.
+  - **PAT (Personal Access Token):** Para cualquier tipo de cuenta. El script solicita email y token, y codifica automáticamente en base64.
+  - **EnvVar (Variable de entorno):** Alternativa simple usando el token directamente.
   - Necesitas: Nombre de tu organizacion en Azure DevOps (`https://dev.azure.com/<nombre>`)
 - **Remoto (preview):** Servidor alojado por Microsoft.
   - Necesitas: URL del MCP server remoto + token Bearer
