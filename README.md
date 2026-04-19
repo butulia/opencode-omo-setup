@@ -4,6 +4,8 @@ Instalador automatico de [oh-my-openagent (OmO)](https://github.com/code-yeongyu
 
 Crea un **perfil aislado** que no afecta la instalacion principal de OpenCode. Permite elegir entre 9 proveedores de modelos (Claude, OpenAI, Gemini, GitHub Copilot, OpenCode Zen, Z.ai, Kimi, OpenCode Go, Vercel AI Gateway) y configura automaticamente los agentes OmO (Sisyphus, Hephaestus, Prometheus, Oracle, etc.). Aplica parches conocidos (ZWSP en nombres de agentes, effort `max` en proxy Copilot).
 
+**Nuevo:** Scripts de configuracion MCP para conectar OpenCode con servicios externos como Azure DevOps y Google Sheets.
+
 ## Requisitos
 
 - Windows 10/11
@@ -41,6 +43,11 @@ Al terminar, hacer doble clic en `OpenCode-OmO.bat` en el Escritorio.
 | `repatch-zwsp.ps1` | Re-aplicar parches (ZWSP + variant) despues de actualizaciones de OmO |
 | `uninstall-omo.ps1` | Desinstalador limpio (revierte todo) |
 | `config/opencode.json` | Registro del plugin OmO para el perfil aislado |
+| `setup-mcp-azure-devops.ps1` | Configura servidor MCP para Azure DevOps (local o remoto) |
+| `setup-mcp-google-sheets.ps1` | Configura servidor MCP para Google Sheets (Service Account u OAuth2) |
+| `uninstall-mcp-azure-devops.ps1` | Elimina configuracion MCP de Azure DevOps |
+| `uninstall-mcp-google-sheets.ps1` | Elimina configuracion MCP de Google Sheets |
+| `_mcp-helpers.ps1` | Funciones compartidas para scripts MCP (no ejecutar directamente) |
 
 ## Proveedores soportados
 
@@ -81,7 +88,62 @@ Elimina todo lo creado por el instalador: perfil aislado, configs, plugin cachea
 | ZWSP (U+200B) | OmO prefixa nombres de agentes con Zero-Width Space para ordenar en la UI, causando que los lookups fallen. Se eliminan los ZWSP de `AGENT_LIST_SORT_PREFIXES`. |
 | Variant `max` -> `high` | El proxy de GitHub Copilot no soporta `effort: "max"` en modelos Claude. Se parchea automaticamente a `"high"`. Los modelos nativos (`anthropic/`) si soportan `"max"`. |
 
+## Scripts MCP
+
+Scripts para configurar servidores MCP (Model Context Protocol) que permiten a OpenCode interactuar con servicios externos.
+
+### Azure DevOps
+
+```powershell
+# Configurar
+powershell -ExecutionPolicy Bypass -File setup-mcp-azure-devops.ps1
+
+# Desinstalar
+powershell -ExecutionPolicy Bypass -File uninstall-mcp-azure-devops.ps1
+```
+
+**Modos de conexion:**
+- **Local (recomendado):** Servidor MCP via npx. Autenticacion via navegador.
+  - Necesitas: Nombre de tu organizacion en Azure DevOps (`https://dev.azure.com/<nombre>`)
+- **Remoto (preview):** Servidor alojado por Microsoft.
+  - Necesitas: URL del MCP server remoto + token Bearer
+
+**Herramientas disponibles:** Work items, repositorios, pipelines, wiki, busqueda, boards, sprints, test plans.
+
+**Documentacion:** https://github.com/microsoft/azure-devops-mcp
+
+### Google Sheets
+
+```powershell
+# Configurar
+powershell -ExecutionPolicy Bypass -File setup-mcp-google-sheets.ps1
+
+# Desinstalar
+powershell -ExecutionPolicy Bypass -File uninstall-mcp-google-sheets.ps1
+```
+
+**Metodos de autenticacion:**
+- **Service Account (recomendado):** Usa `mcp-gsheets`. Acceso automatizado via cuenta de servicio.
+  - Necesitas: Google Cloud Project ID + archivo JSON de clave de Service Account
+  - Cada hoja debe compartirse explicitamente con el email de la cuenta de servicio
+- **OAuth2:** Usa `google-sheets-mcp`. Login con tu cuenta personal de Google.
+  - Necesitas: Archivo JSON de credenciales OAuth + navegador para autorizacion inicial
+
+**Documentacion:**
+- Service Account: https://github.com/freema/mcp-gsheets
+- OAuth2: https://github.com/domdomegg/google-sheets-mcp
+
+### Caracteristicas comunes de los scripts MCP
+
+- **Guias interactivas:** Te explican paso a paso que necesitas tener a mano antes de empezar
+- **Validacion de prerrequisitos:** Comprueban que tienes Node.js instalado
+- **Deteccion automatica:** Buscan el archivo `opencode.json` en la raiz del repo o permiten especificar ruta
+- **Idempotencia:** Re-ejecutar un setup sobrescribe la configuracion anterior
+- **Logs:** Generan archivos `.log` con timestamp para depuracion
+- **Manejo de errores robusto:** Capturan errores inesperados y muestran informacion detallada
+
 ## Documentacion
 
 - [oh-my-openagent docs](https://ohmyopenagent.com/docs)
 - [Anthropic effort levels](https://platform.claude.com/docs/en/build-with-claude/effort#effort-levels)
+- [Azure DevOps MCP](https://github.com/microsoft/azure-devops-mcp)
