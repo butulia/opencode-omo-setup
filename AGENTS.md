@@ -9,7 +9,6 @@ PowerShell automation suite for OpenCode Desktop setup and MCP server configurat
 ├── install-omo.ps1              # Main OmO plugin installer (755 lines)
 ├── repatch-zwsp.ps1             # Re-apply patches after OmO updates
 ├── uninstall-omo.ps1            # Clean uninstaller
-├── setup-mcp-azure-devops.ps1   # Configure Azure DevOps MCP server
 ├── setup-mcp-google-sheets.ps1  # Configure Google Sheets MCP server
 ├── uninstall-mcp-*.ps1          # Remove MCP configurations
 ├── _mcp-helpers.ps1             # Shared functions for MCP scripts
@@ -60,7 +59,7 @@ $e=$null;$t=$null;[System.Management.Automation.Language.Parser]::ParseFile('scr
 ## Key Dependencies
 
 - `oh-my-openagent` npm package (auto-installed/updated)
-- MCP servers via npx: `@azure-devops/mcp`, `mcp-gsheets`, `google-sheets-mcp`
+- MCP servers via npx: `mcp-gsheets`, `google-sheets-mcp`
 
 ## Git Ignore
 

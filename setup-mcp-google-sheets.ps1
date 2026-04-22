@@ -239,13 +239,30 @@ if ($useServiceAccount) {
         exit 1
     }
 
-    $serverDef = [PSCustomObject]@{
-        type        = 'local'
-        command     = @('npx', '-y', 'mcp-gsheets@latest')
-        enabled     = $true
-        environment = [PSCustomObject]@{
-            GOOGLE_PROJECT_ID              = $projectId
-            GOOGLE_APPLICATION_CREDENTIALS = $keyPath
+    # Detectar si mcp-gsheets esta instalado globalmente
+    $globalCmd = Get-Command mcp-gsheets -ErrorAction SilentlyContinue
+
+    if ($globalCmd) {
+        # Usar instalacion global (mas fiable)
+        $serverDef = [PSCustomObject]@{
+            type        = 'local'
+            command     = @('mcp-gsheets')
+            enabled     = $true
+            environment = [PSCustomObject]@{
+                GOOGLE_PROJECT_ID              = $projectId
+                GOOGLE_APPLICATION_CREDENTIALS = $keyPath
+            }
+        }
+    } else {
+        # Fallback a npx (puede tener problemas de dependencias)
+        $serverDef = [PSCustomObject]@{
+            type        = 'local'
+            command     = @('npx', '-y', 'mcp-gsheets@latest')
+            enabled     = $true
+            environment = [PSCustomObject]@{
+                GOOGLE_PROJECT_ID              = $projectId
+                GOOGLE_APPLICATION_CREDENTIALS = $keyPath
+            }
         }
     }
 
@@ -315,19 +332,19 @@ if ($useServiceAccount) {
 }
 
 # =========================================================
-#  PASO 5: Verificacion
+#  PASO 5: Instalacion global del paquete
 # =========================================================
 
-Write-Step "Verificando..."
+Write-Step "Instalando paquete MCP..."
 
 if ($useServiceAccount) {
-    Write-Info "Comprobando que el paquete mcp-gsheets esta disponible..."
+    Write-Info "Instalando mcp-gsheets globalmente..."
     try {
-        & npx -y mcp-gsheets@latest --help 2>&1 | Out-Null
-        Write-Ok "Paquete mcp-gsheets accesible."
+        & npm install -g mcp-gsheets@latest 2>&1 | Out-Null
+        Write-Ok "mcp-gsheets instalado globalmente."
     } catch {
-        Write-Warn "No se pudo verificar el paquete. Se configurara igualmente."
-        Write-Warn "Puede que se descargue automaticamente la primera vez que OpenCode lo use."
+        Write-Warn "No se pudo instalar mcp-gsheets globalmente."
+        Write-Warn "Se intentara usar via npx (puede fallar por dependencias)."
     }
 } else {
     Write-Info "Comprobando que el paquete google-sheets-mcp esta disponible..."

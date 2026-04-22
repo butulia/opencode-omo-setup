@@ -302,7 +302,9 @@ function Remove-McpServer {
     Write-Ok "Servidor '$Name' eliminado de la configuracion."
 
     # Si mcp quedo vacio, eliminar la clave
-    if ($Config.mcp.PSObject.Properties.Count -eq 0) {
+    # Usar @() para forzar array y evitar error si Properties es $null
+    $mcpProps = @($Config.mcp.PSObject.Properties)
+    if ($mcpProps.Count -eq 0) {
         $Config.PSObject.Properties.Remove('mcp')
         Write-Info "La seccion 'mcp' quedo vacia y se elimino."
     }
@@ -323,16 +325,28 @@ function Test-ConfigEmpty {
     #>
     param([PSCustomObject]$Config)
 
-    $functionalKeys = $Config.PSObject.Properties.Name | Where-Object {
-        $_ -ne '$schema' -and $_ -ne 'plugin'
+    # Si es $null, considerar vacio
+    if (-not $Config) {
+        return $true
     }
+
+    # Obtener propiedades como array (para evitar $null.Count)
+    $allProps = @($Config.PSObject.Properties)
+    if ($allProps.Count -eq 0) {
+        return $true
+    }
+
+    $functionalKeys = @($allProps.Name | Where-Object {
+        $_ -ne '$schema' -and $_ -ne 'plugin'
+    })
 
     if ($functionalKeys.Count -gt 0) {
         return $false
     }
 
     # Si tiene plugin, comprobar que no este vacio
-    if ($Config.PSObject.Properties.Name -contains 'plugin') {
+    $pluginProp = $allProps | Where-Object { $_.Name -eq 'plugin' }
+    if ($pluginProp) {
         $plugins = @($Config.plugin)
         if ($plugins.Count -gt 0 -and ($plugins | Where-Object { $_ -and $_.Trim() -ne '' }).Count -gt 0) {
             return $false

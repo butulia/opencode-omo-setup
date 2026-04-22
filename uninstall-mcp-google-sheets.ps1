@@ -120,7 +120,27 @@ if (Test-ConfigEmpty -Config $config) {
 }
 
 # =========================================================
-#  PASO 4: Resumen
+#  PASO 4: Desinstalar paquete global (si existe)
+# =========================================================
+
+Write-Step "Limpiando paquete npm global..."
+
+$globalCmd = Get-Command mcp-gsheets -ErrorAction SilentlyContinue
+if ($globalCmd) {
+    Write-Info "Desinstalando mcp-gsheets globalmente..."
+    try {
+        & npm uninstall -g mcp-gsheets 2>&1 | Out-Null
+        Write-Ok "mcp-gsheets desinstalado globalmente."
+    } catch {
+        Write-Warn "No se pudo desinstalar mcp-gsheets globalmente. Puedes hacerlo manualmente:"
+        Write-Warn "  npm uninstall -g mcp-gsheets"
+    }
+} else {
+    Write-Info "No hay instalacion global de mcp-gsheets."
+}
+
+# =========================================================
+#  PASO 5: Resumen
 # =========================================================
 
 Write-Host ""
@@ -151,8 +171,6 @@ if ($wasOAuth) {
     Write-Host ""
 }
 
-Write-Host "  Nota: los paquetes npm se descargan bajo demanda con npx." -ForegroundColor Gray
-Write-Host "  No hay nada que desinstalar del sistema." -ForegroundColor Gray
 Write-Host "  Log: $LogFile" -ForegroundColor Gray
 Write-Host ""
 

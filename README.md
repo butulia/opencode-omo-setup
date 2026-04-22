@@ -4,7 +4,7 @@ Instalador automatico de [oh-my-openagent (OmO)](https://github.com/code-yeongyu
 
 Crea un **perfil aislado** que no afecta la instalacion principal de OpenCode. Permite elegir entre 9 proveedores de modelos (Claude, OpenAI, Gemini, GitHub Copilot, OpenCode Zen, Z.ai, Kimi, OpenCode Go, Vercel AI Gateway) y configura automaticamente los agentes OmO (Sisyphus, Hephaestus, Prometheus, Oracle, etc.). Aplica parches conocidos (ZWSP en nombres de agentes, effort `max` en proxy Copilot).
 
-**Nuevo:** Scripts de configuracion MCP para conectar OpenCode con servicios externos como Azure DevOps y Google Sheets.
+**Nuevo:** Scripts de configuracion MCP para conectar OpenCode con servicios externos como Google Sheets.
 
 ## Requisitos
 
@@ -43,9 +43,7 @@ Al terminar, hacer doble clic en `OpenCode-OmO.bat` en el Escritorio.
 | `repatch-zwsp.ps1` | Re-aplicar parches (ZWSP + variant) despues de actualizaciones de OmO |
 | `uninstall-omo.ps1` | Desinstalador limpio (revierte todo) |
 | `config/opencode.json` | Registro del plugin OmO para el perfil aislado |
-| `setup-mcp-azure-devops.ps1` | Configura servidor MCP para Azure DevOps (local o remoto) |
 | `setup-mcp-google-sheets.ps1` | Configura servidor MCP para Google Sheets (Service Account u OAuth2) |
-| `uninstall-mcp-azure-devops.ps1` | Elimina configuracion MCP de Azure DevOps |
 | `uninstall-mcp-google-sheets.ps1` | Elimina configuracion MCP de Google Sheets |
 | `_mcp-helpers.ps1` | Funciones compartidas para scripts MCP (no ejecutar directamente) |
 
@@ -92,34 +90,6 @@ Elimina todo lo creado por el instalador: perfil aislado, configs, plugin cachea
 
 Scripts para configurar servidores MCP (Model Context Protocol) que permiten a OpenCode interactuar con servicios externos.
 
-### Azure DevOps
-
-```powershell
-# Configurar
-powershell -ExecutionPolicy Bypass -File setup-mcp-azure-devops.ps1
-
-# Desinstalar
-powershell -ExecutionPolicy Bypass -File uninstall-mcp-azure-devops.ps1
-```
-
-**Metodo de conexion (Servidor Remoto):**
-Microsoft recomienda usar el **servidor MCP remoto** de Azure DevOps. Este metodo es mas estable y soporta todos los tipos de cuenta (personales, profesionales y educativas).
-
-**Requisitos:**
-- URL del servidor MCP remoto de tu organizacion (disponible en https://dev.azure.com/{tu-org}/_settings/mcp)
-- Token de acceso personal (PAT) generado desde Azure DevOps
-
-**El script te guiara paso a paso para:**
-1. Obtener la URL del servidor MCP remoto
-2. Generar un PAT con los permisos necesarios
-3. Configurar la conexion de forma segura
-
-**Herramientas disponibles:** Work items, repositorios, pipelines, wiki, busqueda, boards, sprints, test plans.
-
-**Documentacion:**
-- https://github.com/microsoft/azure-devops-mcp
-- https://learn.microsoft.com/azure/devops/mcp-server/remote-mcp-server
-
 ### Google Sheets
 
 ```powershell
@@ -154,4 +124,3 @@ powershell -ExecutionPolicy Bypass -File uninstall-mcp-google-sheets.ps1
 
 - [oh-my-openagent docs](https://ohmyopenagent.com/docs)
 - [Anthropic effort levels](https://platform.claude.com/docs/en/build-with-claude/effort#effort-levels)
-- [Azure DevOps MCP](https://github.com/microsoft/azure-devops-mcp)
