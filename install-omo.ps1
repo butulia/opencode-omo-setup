@@ -557,20 +557,82 @@ if ($claudeMaxPatched -gt 0) {
 
 # Serializar y guardar
 # ConvertTo-Json de PS 5.1 genera indentacion desalineada (alinea valores por ancho de clave).
-# Usamos Newtonsoft.Json (disponible en Windows via GAC) para obtener JSON bien formateado
-# con 4 espacios de indentacion estandar.
+# Usamos un re-indentador puro en PowerShell que normaliza a 4 espacios estandar.
 function ConvertTo-JsonFormatted([object]$InputObject) {
-    [System.Reflection.Assembly]::LoadWithPartialName("Newtonsoft.Json") | Out-Null
     $compactJson = $InputObject | ConvertTo-Json -Depth 20 -Compress
-    $sb     = [System.Text.StringBuilder]::new()
-    $sw     = [System.IO.StringWriter]::new($sb)
-    $writer = [Newtonsoft.Json.JsonTextWriter]::new($sw)
-    $writer.Formatting  = [Newtonsoft.Json.Formatting]::Indented
-    $writer.IndentChar  = ' '
-    $writer.Indentation = 4
-    $reader = [Newtonsoft.Json.JsonTextReader]::new([System.IO.StringReader]::new($compactJson))
-    $writer.WriteToken($reader)
-    $writer.Flush()
+
+    # Re-indentar manualmente: parsear caracter a caracter
+    $sb      = [System.Text.StringBuilder]::new()
+    $indent  = 0
+    $inStr   = $false
+    $escape  = $false
+    $chars   = $compactJson.ToCharArray()
+
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+        $c = $chars[$i]
+
+        if ($escape) {
+            [void]$sb.Append($c)
+            $escape = $false
+            continue
+        }
+
+        if ($c -eq '\' -and $inStr) {
+            [void]$sb.Append($c)
+            $escape = $true
+            continue
+        }
+
+        if ($c -eq '"') {
+            $inStr = -not $inStr
+            [void]$sb.Append($c)
+            continue
+        }
+
+        if ($inStr) {
+            [void]$sb.Append($c)
+            continue
+        }
+
+        switch ($c) {
+            '{' {
+                [void]$sb.Append($c)
+                $indent++
+                [void]$sb.Append("`n")
+                [void]$sb.Append(' ' * ($indent * 4))
+            }
+            '[' {
+                [void]$sb.Append($c)
+                $indent++
+                [void]$sb.Append("`n")
+                [void]$sb.Append(' ' * ($indent * 4))
+            }
+            '}' {
+                $indent--
+                [void]$sb.Append("`n")
+                [void]$sb.Append(' ' * ($indent * 4))
+                [void]$sb.Append($c)
+            }
+            ']' {
+                $indent--
+                [void]$sb.Append("`n")
+                [void]$sb.Append(' ' * ($indent * 4))
+                [void]$sb.Append($c)
+            }
+            ',' {
+                [void]$sb.Append($c)
+                [void]$sb.Append("`n")
+                [void]$sb.Append(' ' * ($indent * 4))
+            }
+            ':' {
+                [void]$sb.Append(': ')
+            }
+            default {
+                [void]$sb.Append($c)
+            }
+        }
+    }
+
     return $sb.ToString()
 }
 
