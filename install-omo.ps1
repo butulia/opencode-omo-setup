@@ -556,7 +556,25 @@ if ($claudeMaxPatched -gt 0) {
 }
 
 # Serializar y guardar
-$patchedJson = $config | ConvertTo-Json -Depth 10
+# ConvertTo-Json de PS 5.1 genera indentacion desalineada (alinea valores por ancho de clave).
+# Usamos Newtonsoft.Json (disponible en Windows via GAC) para obtener JSON bien formateado
+# con 4 espacios de indentacion estandar.
+function ConvertTo-JsonFormatted([object]$InputObject) {
+    [System.Reflection.Assembly]::LoadWithPartialName("Newtonsoft.Json") | Out-Null
+    $compactJson = $InputObject | ConvertTo-Json -Depth 20 -Compress
+    $sb     = [System.Text.StringBuilder]::new()
+    $sw     = [System.IO.StringWriter]::new($sb)
+    $writer = [Newtonsoft.Json.JsonTextWriter]::new($sw)
+    $writer.Formatting  = [Newtonsoft.Json.Formatting]::Indented
+    $writer.IndentChar  = ' '
+    $writer.Indentation = 4
+    $reader = [Newtonsoft.Json.JsonTextReader]::new([System.IO.StringReader]::new($compactJson))
+    $writer.WriteToken($reader)
+    $writer.Flush()
+    return $sb.ToString()
+}
+
+$patchedJson = ConvertTo-JsonFormatted $config
 [System.IO.File]::WriteAllText($omoConfig, $patchedJson)
 Write-Ok "Config parcheado: $omoConfig"
 
